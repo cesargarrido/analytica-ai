@@ -87,12 +87,26 @@ solo la web (`web:3000`) recibe el dominio.
 Después, en el portafolio (`evoluciondigitalia`), cambia en `content/projects/analytica-ai.mdx` el
 `liveUrl` de `https://analytica-ai.demo` a `https://analytica.evoluciondigitalia.cl` y haz push.
 
+### Opción preferida: app ÚNICA (un solo contenedor)
+
+Si prefieres no usar Docker Compose, el repo tiene un **Dockerfile en la raíz** que empaqueta
+**web + motor en un mismo contenedor** (la web llama al motor por `http://127.0.0.1:8000`).
+En Coolify:
+
+1. **New Resource → App** con build pack **Dockerfile**.
+2. Fuente: repo público `https://github.com/cesargarrido/analytica-ai`, rama `main`.
+3. **Base Directory:** dejar vacío (raíz) · **Dockerfile Location:** `Dockerfile` · **Build Port:** `3000`.
+4. Variables de entorno opcionales: `AI_API_KEY`, `AI_BASE_URL`, `AI_MODEL`. (Sin `DATABASE_URL` usa memoria.)
+5. Dominio: `https://analytica.evoluciondigitalia.cl` · **Deploy**.
+
 ## Estructura
 
 ```
 engine/                    Motor Python FastAPI (main.py, requirements.txt, Dockerfile)
 web/                       Next.js App Router + Tailwind (app/, components/, lib/, Dockerfile)
+Dockerfile                 Contenedor ÚNICO web+motor (para Coolify app única)
+entrypoint.sh              Arranca motor + web dentro del contenedor único
 docker-compose.yml         Desarrollo local (con Docker)
-docker-compose.prod.yml    Producción / Coolify (sin puertos públicos)
+docker-compose.prod.yml    Producción / Coolify con Docker Compose
 .env.example
 ```
