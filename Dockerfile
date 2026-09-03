@@ -29,14 +29,14 @@ ENV NODE_ENV=production \
     ENGINE_URL=http://127.0.0.1:8000 \
     NEXT_TELEMETRY_DISABLED=1
 
-# Node runtime para servir el standalone de Next (binario oficial de nodejs.org)
+# Node runtime para servir el standalone de Next (binario oficial de nodejs.org).
+# curl se mantiene instalado: Coolify lo usa para su healthcheck.
 ARG NODE_VERSION=20.19.0
 RUN apt-get update \
   && apt-get install -y --no-install-recommends ca-certificates curl xz-utils \
   && curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" \
      | tar -xJ -C /opt \
   && mv "/opt/node-v${NODE_VERSION}-linux-x64" /opt/node \
-  && apt-get purge -y --auto-remove curl xz-utils \
   && rm -rf /var/lib/apt/lists/*
 
 ENV PATH="/opt/node/bin:/opt/venv/bin:${PATH}"
