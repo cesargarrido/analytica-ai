@@ -52,7 +52,8 @@ COPY --from=webbuilder /app/web/public ./public
 
 # Motor
 COPY --from=engine /opt/venv /opt/venv
-RUN mkdir -p /srv/engine && cp /opt/engine-src/main.py /srv/engine/main.py
+RUN mkdir -p /srv/engine
+COPY --from=engine /opt/engine-src/main.py /srv/engine/main.py
 
 # Entrypoint (arranca motor + web juntos)
 COPY entrypoint.sh /entrypoint.sh
