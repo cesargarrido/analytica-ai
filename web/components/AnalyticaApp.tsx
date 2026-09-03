@@ -63,9 +63,14 @@ export function AnalyticaApp() {
   const [dragOver, setDragOver] = useState(false);
   const [aiCfg, setAiCfg] = useState<AiConfig>(DEFAULT_AI);
   const [showAiCfg, setShowAiCfg] = useState(false);
+  const [serverAi, setServerAi] = useState<{ apiKeyConfigured: boolean; model: string; baseUrl: string } | null>(null);
 
   useEffect(() => {
     setAiCfg(loadConfig());
+    fetch("/api/ai-summary")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setServerAi(d))
+      .catch(() => {});
   }, []);
 
   const saveCfg = (next: AiConfig) => {
@@ -295,7 +300,8 @@ export function AnalyticaApp() {
               meta={meta}
               analysis={analysis}
               sparkSeries={sparkSeries}
-              hasAiKey={Boolean(aiCfg.apiKey.trim())}
+              hasAiKey={Boolean(aiCfg.apiKey.trim()) || Boolean(serverAi?.apiKeyConfigured)}
+              aiServerModel={!aiCfg.apiKey.trim() && serverAi?.apiKeyConfigured ? serverAi.model : null}
               aiSummary={aiSummary}
               aiState={aiState}
               onAI={runAI}
@@ -358,6 +364,7 @@ function Results({
   analysis,
   sparkSeries,
   hasAiKey,
+  aiServerModel,
   aiSummary,
   aiState,
   onAI,
@@ -367,6 +374,7 @@ function Results({
   analysis: Analysis;
   sparkSeries: { name: string; series: number[] }[];
   hasAiKey: boolean;
+  aiServerModel: string | null;
   aiSummary: string;
   aiState: "idle" | "loading" | "done" | "error";
   onAI: () => void;
@@ -513,17 +521,27 @@ function Results({
         <div className="space-y-3">
           {!hasAiKey && (
             <p className="text-xs text-white/40">
-              Configura la API key en el panel «IA opcional» de la izquierda (o define AI_API_KEY en el servidor).
+              Sin clave configurada: añádela en el panel «IA opcional» (izquierda) o define{" "}
+              <code className="bg-white/10 px-1 rounded">AI_API_KEY</code> en las variables del servidor.
             </p>
           )}
           {aiState === "idle" && (
-            <button
-              onClick={onAI}
-              disabled={!hasAiKey}
-              className="rounded-xl border border-[#00f3ff]/60 text-[#00f3ff] font-semibold px-4 py-2.5 hover:bg-[#00f3ff]/10 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              ✨ Explicar hallazgos con IA
-            </button>
+            <>
+              <button
+                onClick={onAI}
+                disabled={!hasAiKey}
+                className="rounded-xl border border-[#00f3ff]/60 text-[#00f3ff] font-semibold px-4 py-2.5 hover:bg-[#00f3ff]/10 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                ✨ Explicar hallazgos con IA
+              </button>
+              {hasAiKey && aiServerModel && (
+                <p className="text-xs text-white/40">
+                  Usando la clave configurada en el servidor (modelo{" "}
+                  <b className="text-white/70">{aiServerModel}</b>). Si rellenas el panel de la
+                  izquierda, esa configuración tiene prioridad.
+                </p>
+              )}
+            </>
           )}
           {aiState === "loading" && <p className="text-white/50 text-sm">Generando resumen…</p>}
           {aiState === "done" && aiSummary && (

@@ -13,6 +13,14 @@ interface AiOverride {
   model?: string;
 }
 
+export async function GET() {
+  return NextResponse.json({
+    apiKeyConfigured: Boolean(ENV_API_KEY),
+    model: ENV_MODEL,
+    baseUrl: ENV_BASE_URL,
+  });
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
