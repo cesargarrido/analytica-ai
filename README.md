@@ -26,34 +26,32 @@ Stack: **Next.js 16 + Tailwind** (web/API) · **Python FastAPI** (motor de anál
 
 ## Ejecución local
 
-Requisito: Docker (con compose).
+**No necesitas Docker** para correr la demo en desarrollo: motor en un venv de Python + web con `npm`. Docker/compose queda como opción para servidores (p. ej. desplegar en Coolify).
 
 ```bash
-# 1. Variables opcionales
-cp .env.example .env          # pega AI_API_KEY si quieres el resumen con IA
-
-# 2. Levantar todo (db + motor + web)
-docker compose up --build
-
-# 3. Abrir
-open http://localhost:3000
-```
-
-Sin Docker (solo web + motor):
-
-```bash
-# Motor
-python3 -m venv .venv && source .venv/bin/activate
+# Terminal 1 — Motor Python (http://127.0.0.1:8000)
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -r engine/requirements.txt
 uvicorn main:app --app-dir engine --port 8000
 
-# Web (otra terminal)
+# Terminal 2 — Web (http://localhost:3000)
 cd web
 npm install
-npm run dev      # http://localhost:3000
+npm run dev
 ```
 
-La web sin `DATABASE_URL` funciona en memoria. El botón **"Probar con datos de ejemplo"** carga un CSV de ventas con tendencia, un outlier puntual y correlación ventas↔usuarios.
+La web sin `DATABASE_URL` funciona con almacenamiento en memoria (suficiente para la demo). Si quieres el **resumen con IA**, define en la terminal de la web: `AI_API_KEY=...` (y opcionalmente `AI_BASE_URL`/`AI_MODEL`).
+
+### Con Docker (opcional, p. ej. servidor/Coolify)
+
+```bash
+cp .env.example .env          # pega AI_API_KEY si quieres el resumen con IA
+docker compose up --build     # levanta db + motor + web
+open http://localhost:3000
+```
+
+El botón **"Probar con datos de ejemplo"** carga un CSV de ventas con tendencia, un outlier puntual y correlación ventas↔usuarios.
 
 ## API del motor (Python)
 
