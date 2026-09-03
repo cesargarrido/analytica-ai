@@ -1,0 +1,52 @@
+# Versión de producción para Coolify.
+# - La DB y el motor NO se publican a internet (red interna del compose).
+# - Coolify enruta el dominio hacia el servicio `web` (puerto 3000) por su proxy.
+# - Variables IA (AI_API_KEY, AI_BASE_URL, AI_MODEL) se inyectan desde Coolify.
+# - Dominio esperado: https://analytica.evoluciondigitalia.cl
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: analytica
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-analytica}
+      POSTGRES_DB: analytica
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U analytica -d analytica"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  engine:
+    build: ./engine
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health').status==200 else 1)\"",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  web:
+    build: ./web
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://analytica:${POSTGRES_PASSWORD:-analytica}@db:5432/analytica
+      ENGINE_URL: http://engine:8000
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_BASE_URL: ${AI_BASE_URL:-https://api.openai.com/v1}
+      AI_MODEL: ${AI_MODEL:-gpt-4o-mini}
+    depends_on:
+      db:
+        condition: service_healthy
+      engine:
+        condition: service_healthy
+
+volumes:
+  pgdata:

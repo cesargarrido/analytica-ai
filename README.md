@@ -71,17 +71,28 @@ Variables de entorno en la web:
 | `AI_BASE_URL` | `https://api.openai.com/v1` | Compatible con cualquier API estilo OpenAI (p. ej. DeepSeek: `https://api.deepseek.com/v1`). |
 | `AI_MODEL` | `gpt-4o-mini` | Modelo a usar (p. ej. `deepseek-v4-flash`). |
 
-## Deploy en Coolify
+## Deploy en Coolify (dominio: https://analytica.evoluciondigitalia.cl)
 
-1. Crea una app "Docker Compose" apuntando a `cesargarrido/analytica-ai` (rama `main`).
-2. En el compose editor asegúrate de las variables de entorno (`AI_API_KEY`, etc.) y mapea dominios/subdominios a `web:3000`, `engine:8000`.
-3. `db` puede sustituirse por el servicio PostgreSQL de Coolify si lo prefieres.
+Usa **`docker-compose.prod.yml`**: la DB y el motor quedan en la red interna (sin URL pública) y
+solo la web (`web:3000`) recibe el dominio.
+
+1. En Coolify → **New Resource → Docker Compose** (o **App** apuntando al repo `cesargarrido/analytica-ai`, rama `main`).
+2. Pega el contenido de `docker-compose.prod.yml` (o déjalo que lo tome del repo).
+3. Variables de entorno del recurso (opcionales): `AI_API_KEY`, `AI_BASE_URL`, `AI_MODEL` y `POSTGRES_PASSWORD`.
+4. En la pestaña del recurso, asigna el **dominio al servicio `web`** con puerto **3000**: `https://analytica.evoluciondigitalia.cl`.
+5. **Motor y DB sin dominio** (quedan internos y alcanzables por `http://engine:8000` / `db:5432`).
+6. Asegura DNS: el subdominio `analytica` debe resolver al servidor de Coolify (si ya tienes `n8n.evoluciondigitalia.cl`, probablemente hay wildcard y no necesitas tocar nada).
+7. **Deploy**. La demo quedará en https://analytica.evoluciondigitalia.cl.
+
+Después, en el portafolio (`evoluciondigitalia`), cambia en `content/projects/analytica-ai.mdx` el
+`liveUrl` de `https://analytica-ai.demo` a `https://analytica.evoluciondigitalia.cl` y haz push.
 
 ## Estructura
 
 ```
-engine/          Motor Python FastAPI (main.py, requirements.txt, Dockerfile)
-web/             Next.js App Router + Tailwind (app/, components/, lib/, Dockerfile)
-docker-compose.yml
+engine/                    Motor Python FastAPI (main.py, requirements.txt, Dockerfile)
+web/                       Next.js App Router + Tailwind (app/, components/, lib/, Dockerfile)
+docker-compose.yml         Desarrollo local (con Docker)
+docker-compose.prod.yml    Producción / Coolify (sin puertos públicos)
 .env.example
 ```
