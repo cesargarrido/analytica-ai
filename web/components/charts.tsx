@@ -1,15 +1,18 @@
 "use client";
 
-interface SparklineProps {
+export type ChartKind = "line" | "area" | "bar";
+
+interface ChartProps {
   data: number[];
   width?: number;
   height?: number;
   color?: string;
+  kind?: ChartKind;
 }
 
-export function Sparkline({ data, width = 240, height = 64, color = "#00f3ff" }: SparklineProps) {
+export function Sparkline({ data, width = 240, height = 64, color = "#00f3ff", kind = "line" }: ChartProps) {
   const values = data.filter((v) => typeof v === "number" && Number.isFinite(v));
-  if (values.length < 2) {
+  if (values.length < 1) {
     return (
       <div className="text-xs text-white/40" style={{ height }}>
         Sin serie suficiente para graficar
@@ -23,23 +26,48 @@ export function Sparkline({ data, width = 240, height = 64, color = "#00f3ff" }:
   const pad = 4;
 
   const pts = values.map((v, i) => {
-    const x = pad + (i / (values.length - 1)) * (width - pad * 2);
+    const x = pad + (i / Math.max(1, values.length - 1)) * (width - pad * 2);
     const y = pad + (1 - (v - min) / range) * (height - pad * 2);
-    return { x, y };
+    return { x, y, v };
   });
 
   const line = pts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
-  const area = `${line} L${pts[pts.length - 1].x.toFixed(1)},${height} L${pts[0].x.toFixed(1)},${height} Z`;
+
+  if (kind === "bar") {
+    const bw = Math.max(2, (width - pad * 2) / values.length - 2);
+    return (
+      <svg viewBox={`0 0 ${width} ${height}`} width="100%" height={height} role="img" aria-hidden="true">
+        {pts.map((p, i) => {
+          const h = Math.max(1, (p.v - min) / range * (height - pad * 2));
+          return (
+            <rect
+              key={i}
+              x={p.x - bw / 2}
+              y={height - pad - h}
+              width={bw}
+              height={h}
+              rx={2}
+              fill={color}
+              opacity={0.85}
+            />
+          );
+        })}
+      </svg>
+    );
+  }
+
+  if (kind === "area") {
+    const area = `${line} L${pts[pts.length - 1].x.toFixed(1)},${height - pad} L${pts[0].x.toFixed(1)},${height - pad} Z`;
+    return (
+      <svg viewBox={`0 0 ${width} ${height}`} width="100%" height={height} role="img" aria-hidden="true">
+        <path d={area} fill={color} opacity={0.18} />
+        <path d={line} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+      </svg>
+    );
+  }
 
   return (
-    <svg
-      viewBox={`0 0 ${width} ${height}`}
-      width="100%"
-      height={height}
-      role="img"
-      aria-hidden="true"
-    >
-      <path d={area} fill={color} opacity={0.12} />
+    <svg viewBox={`0 0 ${width} ${height}`} width="100%" height={height} role="img" aria-hidden="true">
       <path d={line} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
       <circle cx={pts[pts.length - 1].x} cy={pts[pts.length - 1].y} r={3} fill={color} />
     </svg>

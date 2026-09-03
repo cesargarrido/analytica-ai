@@ -3,22 +3,38 @@ import type { Analysis } from "@/lib/types";
 
 export const runtime = "nodejs";
 
-const AI_API_KEY = process.env.AI_API_KEY ?? "";
-const AI_BASE_URL = (process.env.AI_BASE_URL ?? "https://api.openai.com/v1").replace(/\/$/, "");
-const AI_MODEL = process.env.AI_MODEL ?? "gpt-4o-mini";
+const ENV_API_KEY = process.env.AI_API_KEY ?? "";
+const ENV_BASE_URL = (process.env.AI_BASE_URL ?? "https://api.openai.com/v1").replace(/\/$/, "");
+const ENV_MODEL = process.env.AI_MODEL ?? "gpt-4o-mini";
+
+interface AiOverride {
+  apiKey?: string;
+  baseUrl?: string;
+  model?: string;
+}
 
 export async function POST(req: NextRequest) {
   try {
-    if (!AI_API_KEY) {
-      return NextResponse.json(
-        { error: "IA opcional no configurada: define AI_API_KEY (y opcionalmente AI_BASE_URL/AI_MODEL) en el entorno." },
-        { status: 400 }
-      );
-    }
     const body = await req.json();
     const analysis = body?.analysis as Analysis | undefined;
     if (!analysis) {
       return NextResponse.json({ error: "Falta el análisis para resumir." }, { status: 400 });
+    }
+
+    const override = (body?.ai ?? {}) as AiOverride;
+    const apiKey = (override.apiKey ?? ENV_API_KEY).trim();
+    const baseUrl = (override.baseUrl ?? ENV_BASE_URL).replace(/\/$/, "").trim() || "https://api.openai.com/v1";
+    const model = (override.model ?? ENV_MODEL).trim() || "gpt-4o-mini";
+
+    if (!apiKey) {
+      return NextResponse.json(
+        {
+          error:
+            "IA opcional no configurada: añade tu API key en el panel «IA opcional» de la app, " +
+            "o define AI_API_KEY en el servidor.",
+        },
+        { status: 400 }
+      );
     }
 
     const payload = {
@@ -30,14 +46,14 @@ export async function POST(req: NextRequest) {
       columns: analysis.columns,
     };
 
-    const response = await fetch(`${AI_BASE_URL}/chat/completions`, {
+    const response = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${AI_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: AI_MODEL,
+        model,
         temperature: 0.4,
         messages: [
           {

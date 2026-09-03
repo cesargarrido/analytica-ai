@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Analysis, DatasetMeta } from "@/lib/types";
-import { Sparkline, trendColor, corrColor } from "./charts";
+import { Sparkline, trendColor, corrColor, type ChartKind } from "./charts";
 
 const SAMPLE_CSV = `mes,ventas_miles,usuarios_activos,churn_pct
 2025-01,120,4000,3.1
@@ -26,6 +26,31 @@ const SAMPLE_CSV = `mes,ventas_miles,usuarios_activos,churn_pct
 2026-07,352,17800,0.9
 2026-08,371,19200,0.8`;
 
+const STORAGE_KEY = "analytica-ai-config";
+
+interface AiConfig {
+  apiKey: string;
+  baseUrl: string;
+  model: string;
+}
+
+const DEFAULT_AI: AiConfig = {
+  apiKey: "",
+  baseUrl: "https://api.openai.com/v1",
+  model: "gpt-4o-mini",
+};
+
+function loadConfig(): AiConfig {
+  if (typeof window === "undefined") return DEFAULT_AI;
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return DEFAULT_AI;
+    return { ...DEFAULT_AI, ...(JSON.parse(raw) as Partial<AiConfig>) };
+  } catch {
+    return DEFAULT_AI;
+  }
+}
+
 type Phase = "idle" | "uploading" | "analyzing" | "ready" | "error";
 
 export function AnalyticaApp() {
@@ -36,6 +61,21 @@ export function AnalyticaApp() {
   const [aiSummary, setAiSummary] = useState<string>("");
   const [aiState, setAiState] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [dragOver, setDragOver] = useState(false);
+  const [aiCfg, setAiCfg] = useState<AiConfig>(DEFAULT_AI);
+  const [showAiCfg, setShowAiCfg] = useState(false);
+
+  useEffect(() => {
+    setAiCfg(loadConfig());
+  }, []);
+
+  const saveCfg = (next: AiConfig) => {
+    setAiCfg(next);
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    } catch {
+      /* noop */
+    }
+  };
 
   const run = useCallback(async (file: File) => {
     setPhase("uploading");
@@ -87,10 +127,18 @@ export function AnalyticaApp() {
     setAiState("loading");
     setAiSummary("");
     try {
+      const body: Record<string, unknown> = { analysis };
+      if (aiCfg.apiKey.trim()) {
+        body.ai = {
+          apiKey: aiCfg.apiKey.trim(),
+          baseUrl: aiCfg.baseUrl.trim() || DEFAULT_AI.baseUrl,
+          model: aiCfg.model.trim() || DEFAULT_AI.model,
+        };
+      }
       const res = await fetch("/api/ai-summary", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ analysis }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Error llamando a la IA.");
@@ -100,9 +148,8 @@ export function AnalyticaApp() {
       setAiState("error");
       setAiSummary(err instanceof Error ? err.message : "Error.");
     }
-  }, [analysis]);
+  }, [analysis, aiCfg]);
 
-  const inputKey = meta ? meta.id : "file";
   const busy = phase === "uploading" || phase === "analyzing";
 
   return (
@@ -114,7 +161,7 @@ export function AnalyticaApp() {
         </h1>
         <p className="text-white/55 mt-4 max-w-2xl mx-auto">
           Sube un CSV y deja que el motor Python detecte tendencias, outliers, correlaciones y anomalías.
-          Sin registro. Sin configurar nada.
+          Sin registro.
         </p>
       </header>
 
@@ -136,7 +183,7 @@ export function AnalyticaApp() {
             }`}
           >
             <input
-              key={inputKey}
+              key={meta ? meta.id : "file"}
               id="csv-file"
               type="file"
               accept=".csv,text/csv"
@@ -167,6 +214,53 @@ export function AnalyticaApp() {
             </button>
           </div>
 
+          <div className="rounded-xl border border-white/10 bg-white/[0.03]">
+            <button
+              onClick={() => setShowAiCfg((v) => !v)}
+              className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-white/80 hover:text-white"
+            >
+              <span>🤖 IA opcional (resumen)</span>
+              <span className="text-white/40">{showAiCfg ? "▾" : "▸"}</span>
+            </button>
+            {showAiCfg && (
+              <div className="px-4 pb-4 space-y-3">
+                <label className="block text-xs text-white/50">
+                  API Key
+                  <input
+                    type="password"
+                    value={aiCfg.apiKey}
+                    onChange={(e) => saveCfg({ ...aiCfg, apiKey: e.target.value })}
+                    placeholder="sk-…"
+                    className="mt-1 w-full rounded-lg bg-white/5 border border-white/15 px-3 py-2 text-sm text-white placeholder-white/30 focus:outline-none focus:border-[#00f3ff]"
+                  />
+                </label>
+                <label className="block text-xs text-white/50">
+                  Base URL
+                  <input
+                    type="text"
+                    value={aiCfg.baseUrl}
+                    onChange={(e) => saveCfg({ ...aiCfg, baseUrl: e.target.value })}
+                    className="mt-1 w-full rounded-lg bg-white/5 border border-white/15 px-3 py-2 text-sm text-white focus:outline-none focus:border-[#00f3ff]"
+                  />
+                </label>
+                <label className="block text-xs text-white/50">
+                  Modelo
+                  <input
+                    type="text"
+                    value={aiCfg.model}
+                    onChange={(e) => saveCfg({ ...aiCfg, model: e.target.value })}
+                    className="mt-1 w-full rounded-lg bg-white/5 border border-white/15 px-3 py-2 text-sm text-white focus:outline-none focus:border-[#00f3ff]"
+                  />
+                </label>
+                <p className="text-[11px] text-white/35 leading-relaxed">
+                  Compatible con cualquier API estilo OpenAI (OpenAI, DeepSeek…). La key se guarda{" "}
+                  <b>solo en tu navegador</b> (localStorage) y viaja al servidor únicamente al pulsar el
+                  botón de resumen.
+                </p>
+              </div>
+            )}
+          </div>
+
           {error && (
             <div className="rounded-xl border border-red-400/40 bg-red-500/10 p-4 text-sm text-red-200 whitespace-pre-line">
               {error}
@@ -182,7 +276,7 @@ export function AnalyticaApp() {
                 <li>Subes un CSV con una primera fila de encabezados.</li>
                 <li>Se detectan columnas numéricas y de texto automáticamente.</li>
                 <li>El motor calcula tendencia (regresión), outliers (IQR), correlaciones y anomalías recientes.</li>
-                <li>Opcional: un resumen narrativo con IA (se habilita con <code className="bg-white/10 px-1 rounded">AI_API_KEY</code>).</li>
+                <li>Opcional: resumen narrativo con IA (configúralo en el panel de la izquierda).</li>
               </ol>
             </div>
           )}
@@ -201,6 +295,7 @@ export function AnalyticaApp() {
               meta={meta}
               analysis={analysis}
               sparkSeries={sparkSeries}
+              hasAiKey={Boolean(aiCfg.apiKey.trim())}
               aiSummary={aiSummary}
               aiState={aiState}
               onAI={runAI}
@@ -223,12 +318,38 @@ export function AnalyticaApp() {
   );
 }
 
-function Card({ title, children }: { title: string; children: React.ReactNode }) {
+function Card({ title, right, children }: { title: string; right?: React.ReactNode; children: React.ReactNode }) {
   return (
     <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-      <h2 className="font-bold text-sm uppercase tracking-wider text-[#00f3ff] mb-4">{title}</h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="font-bold text-sm uppercase tracking-wider text-[#00f3ff]">{title}</h2>
+        {right}
+      </div>
       {children}
     </section>
+  );
+}
+
+function ChartTypeToggle({ value, onChange }: { value: ChartKind; onChange: (k: ChartKind) => void }) {
+  const options: { key: ChartKind; label: string }[] = [
+    { key: "line", label: "Línea" },
+    { key: "area", label: "Área" },
+    { key: "bar", label: "Barras" },
+  ];
+  return (
+    <div className="flex rounded-lg border border-white/15 overflow-hidden">
+      {options.map((o) => (
+        <button
+          key={o.key}
+          onClick={() => onChange(o.key)}
+          className={`px-3 py-1.5 text-xs font-semibold transition-colors ${
+            value === o.key ? "bg-[#00f3ff] text-black" : "text-white/55 hover:text-white"
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -236,6 +357,7 @@ function Results({
   meta,
   analysis,
   sparkSeries,
+  hasAiKey,
   aiSummary,
   aiState,
   onAI,
@@ -244,6 +366,7 @@ function Results({
   meta: DatasetMeta;
   analysis: Analysis;
   sparkSeries: { name: string; series: number[] }[];
+  hasAiKey: boolean;
   aiSummary: string;
   aiState: "idle" | "loading" | "done" | "error";
   onAI: () => void;
@@ -251,6 +374,7 @@ function Results({
 }) {
   const numericSummary = analysis.summaries.filter((s) => s.type === "number");
   const textSummary = analysis.summaries.filter((s) => s.type === "string");
+  const [chartKind, setChartKind] = useState<ChartKind>("line");
 
   return (
     <div className="space-y-5">
@@ -295,7 +419,7 @@ function Results({
       )}
 
       {sparkSeries.length > 0 && (
-        <Card title="Tendencias">
+        <Card title="Tendencias" right={<ChartTypeToggle value={chartKind} onChange={setChartKind} />}>
           <div className="grid sm:grid-cols-2 gap-5">
             {sparkSeries.map(({ name, series }) => {
               const trend = analysis.trends[name];
@@ -313,7 +437,7 @@ function Results({
                       </span>
                     )}
                   </div>
-                  <Sparkline data={series} />
+                  <Sparkline data={series} kind={chartKind} />
                 </div>
               );
             })}
@@ -387,10 +511,16 @@ function Results({
 
       <Card title="Resumen con IA (opcional)">
         <div className="space-y-3">
+          {!hasAiKey && (
+            <p className="text-xs text-white/40">
+              Configura la API key en el panel «IA opcional» de la izquierda (o define AI_API_KEY en el servidor).
+            </p>
+          )}
           {aiState === "idle" && (
             <button
               onClick={onAI}
-              className="rounded-xl border border-[#00f3ff]/60 text-[#00f3ff] font-semibold px-4 py-2.5 hover:bg-[#00f3ff]/10"
+              disabled={!hasAiKey}
+              className="rounded-xl border border-[#00f3ff]/60 text-[#00f3ff] font-semibold px-4 py-2.5 hover:bg-[#00f3ff]/10 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               ✨ Explicar hallazgos con IA
             </button>
